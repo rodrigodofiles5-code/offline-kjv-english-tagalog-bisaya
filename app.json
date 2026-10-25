@@ -4,16 +4,26 @@
     "slug": "offline-kjv-english-tagalog-bisaya",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
     "android": {
       "package": "com.rodrigodofiles.offlinekjv",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
-    },
-    "extra": {
-      "eas": {
-        "projectId": "2c0cc2da-3d7b-40c0-ae38-4a7ee9dc5df6"
       }
     }
   }
