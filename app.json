@@ -1,23 +1,20 @@
-name: create-production-builds
-on:
-  workflow_dispatch:
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Setup EAS
-        run: npm install -g eas-cli@latest
-      - name: Install dependencies
-        run: npm install
-      - name: Init EAS project
-        run: npx eas init --non-interactive || true
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      - name: Build Android
-        run: npx eas build --platform android --non-interactive --no-wait
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+{
+  "expo": {
+    "name": "offline-kjv-english-tagalog-bisaya",
+    "slug": "offline-kjv-english-tagalog-bisaya",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "android": {
+      "package": "com.rodrigodofiles.offlinekjv",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2c0cc2da-3d7b-40c0-ae38-4a7ee9dc5df6"
+      }
+    }
+  }
+}
