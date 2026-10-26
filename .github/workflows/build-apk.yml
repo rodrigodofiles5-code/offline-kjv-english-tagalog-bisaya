@@ -14,50 +14,39 @@ jobs:
         with: { distribution: temurin, java-version: 17 }
 
       - name: Deep Clean
-        run: |
-          rm -rf android node_modules package-lock.json
-          rm -rf ~/.gradle/caches ~/.gradle/wrapper
+        run: rm -rf android node_modules package-lock.json ~/.gradle/caches
 
-      - name: Install with Expo 53 official versions
+      - name: Install - Force SDK 53 compatible autolinking
         run: |
           npm i --legacy-peer-deps
-          npm i expo@~53.0.20 expo-modules-core@2.2.3 @react-native/gradle-plugin@0.77.1 --save --legacy-peer-deps --force
+          npm i expo@~53.0.20 expo-modules-core@2.3.13 expo-modules-autolinking@2.2.4 @expo/config-plugins@10.0.0 --save --legacy-peer-deps --force
+          npx expo install --fix -- --legacy-peer-deps
 
       - name: Prebuild
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: FIX to Expo Official Compatible Versions
+      - name: FIX - Official Expo 53 versions
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
-          # Expo 53 = Gradle 8.8 + AGP 8.6 + Kotlin 1.9.24 - ito ang hindi magka-conflict
-          sed -i "s/gradle-.*-bin.zip/gradle-8.8-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
+          sed -i "s/gradle-.*-bin.zip/gradle-8.10.2-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
           python3 << 'PY'
-          import pathlib, re, glob
+          import pathlib, re
+          # Expo 53 official: Gradle 8.10.2 + AGP 8.7.3 + Kotlin 2.0.21
+          b = pathlib.Path('android/build.gradle').read_text()
+          b = re.sub(r"kotlinVersion.*", "kotlinVersion = '2.0.21'", b)
+          b = re.sub(r"kspVersion.*", "kspVersion = '2.0.21-1.0.28'", b)
+          b = re.sub(r"com.android.tools.build:gradle:[0-9.]+", "com.android.tools.build:gradle:8.7.3", b)
+          if "2.0.21" not in b:
+              b = b.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.0.21'; kspVersion = '2.0.21-1.0.28' }")
+          pathlib.Path('android/build.gradle').write_text(b)
 
-          # 1. Force Kotlin 1.9.24 sa buong project para tugma sa expo-module-gradle-plugin
-          build = pathlib.Path('android/build.gradle').read_text()
-          build = re.sub(r"kotlinVersion.*", "kotlinVersion = '1.9.24'", build)
-          build = re.sub(r"kspVersion.*", "kspVersion = '1.9.24-1.0.20'", build)
-          if "1.9.24" not in build:
-              build = build.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '1.9.24'; kspVersion = '1.9.24-1.0.20' }")
-          pathlib.Path('android/build.gradle').write_text(build)
-
-          # 2. Promise.kt fix
-          for p in glob.glob('**/Promise.kt', recursive=True):
-              txt = pathlib.Path(p).read_text()
-              if 'override fun reject' in txt:
-                  pathlib.Path(p).write_text(txt.replace('override fun reject','fun reject').replace('override fun resolve','fun resolve'))
-                  print(f"FIXED {p}")
-
-          # 3. Alisin .getAbsolutePath() na sumisira sa line 100
           app = pathlib.Path('android/app/build.gradle').read_text().replace('.getAbsolutePath()','')
           pathlib.Path('android/app/build.gradle').write_text(app)
-
-          print("FIXED: Now using Kotlin 1.9.24 + Gradle 8.8")
+          print("FIXED to 8.10.2 + 2.0.21 + 8.7.3")
           PY
 
       - name: Build APK
-        run: cd android && chmod +x gradlew && ./gradlew clean && ./gradlew assembleDebug --stacktrace --no-daemon
+        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --stacktrace
 
       - uses: actions/upload-artifact@v4
         with: { name: offline-kjv-apk, path: android/app/build/outputs/apk/debug/app-debug.apk }
