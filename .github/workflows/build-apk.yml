@@ -16,22 +16,22 @@ jobs:
       - name: Deep Clean
         run: rm -rf android node_modules package-lock.json ~/.gradle
 
-      - name: Install - Auto Fix SDK 53
+      - name: Install - Fix Worklets version for RN 0.79.6
         run: |
           npm i --legacy-peer-deps
+          npm i react-native-worklets@0.4.1 react-native-reanimated@3.17.5 --save --legacy-peer-deps --force
           npx expo install expo@~53.0.20 --fix -- --legacy-peer-deps
           npx expo install --fix -- --legacy-peer-deps
 
       - name: Prebuild
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: FIX - File.plus final
+      - name: FIX - Gradle 8.10.2 + File.plus
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.10.2-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
           python3 << 'PY'
           import pathlib, re
-          # Kotlin + AGP
           b = pathlib.Path('android/build.gradle').read_text()
           b = re.sub(r"kotlinVersion.*", "kotlinVersion = '2.0.21'", b)
           b = re.sub(r"kspVersion.*", "kspVersion = '2.0.21-1.0.28'", b)
@@ -40,17 +40,14 @@ jobs:
               b = b.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.0.21'; kspVersion = '2.0.21-1.0.28' }")
           pathlib.Path('android/build.gradle').write_text(b)
 
-          # Fix app/build.gradle - File.plus
           p = pathlib.Path('android/app/build.gradle')
           t = p.read_text()
-          # 1. ibalik yung mga na-absolutePath dati na nasira
           t = t.replace('.absolutePath + "/sdks', '+ "/sdks')
-          # 2. tamang fix: toString() gumagana sa File at String pareho
           t = re.sub(r'\+\s*"/sdks/hermesc/%OS-BIN%/hermesc"', '.toString() + "/sdks/hermesc/%OS-BIN%/hermesc"', t)
           t = re.sub(r'(\w+)\s*\+\s*"/sdks/hermesc', r'\1.toString() + "/sdks/hermesc', t)
           t = re.sub(r'(\w+)\s*\+\s*"/sdks', r'\1.toString() + "/sdks', t)
           p.write_text(t)
-          print("FIXED with toString()")
+          print("FIXED")
           PY
 
       - name: Build APK
