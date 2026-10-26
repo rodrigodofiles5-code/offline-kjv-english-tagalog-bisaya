@@ -14,27 +14,28 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm install --legacy-peer-deps
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-      - run: npm install -g eas-cli
+      - name: Install deps
+        run: npm install --legacy-peer-deps
 
-      - name: Init EAS project if needed
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Prebuild Android folder locally
+        run: npx expo prebuild --platform android --clean --non-interactive
+
+      - name: Build APK locally
         run: |
-          if ! grep -q "projectId" app.json; then
-            echo "No projectId found, initializing EAS project..."
-            eas init --account rodrigodofiles --non-interactive || true
-          fi
-          cat app.json || cat app.config.js || echo "no app config"
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
 
-      - name: Create eas.json if missing
-        run: |
-          if [ ! -f eas.json ]; then
-            echo '{"cli":{"version":">= 5.9.0","appVersionSource":"remote"},"build":{"preview":{"distribution":"internal","android":{"buildType":"apk"}}}}' > eas.json
-          fi
-
-      - name: Build APK
-        run: eas build --platform android --profile preview --non-interactive --no-wait
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-kjv-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
