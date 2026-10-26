@@ -25,7 +25,7 @@ jobs:
           npm install react-native-reanimated@4.1.0 react-native-worklets@0.5.1 react-native-screens@4.11.1 react-native-safe-area-context@5.4.0 --save --legacy-peer-deps --force
       - name: Prebuild PURE LOCAL
         run: npx expo prebuild --platform android --clean --non-interactive
-      - name: FIX gradle keystore kotlin
+      - name: FIX gradle keystore kotlin Promise
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
@@ -70,12 +70,13 @@ jobs:
           if "kspVersion" not in bt:
               bt=re.sub(r"(kotlinVersion\s*=\s*'2\.0\.21')",r"\1\n        kspVersion = '2.0.21-1.0.28'",bt)
           b.write_text(bt)
-          for f in glob.glob('node_modules/expo-modules-core/android/build.gradle'):
+          # DIRECT FIX SA Promise.kt - tanggalin ang 'override' na nagpapa-fail
+          for f in glob.glob('node_modules/expo-modules-core/**/Promise.kt', recursive=True):
               txt=pathlib.Path(f).read_text()
-              txt=txt.replace("2.1.20","2.0.21")
-              txt=re.sub(r"if.*kotlin.*throw.*","// removed check",txt)
+              txt=txt.replace('override fun reject','fun reject')
               pathlib.Path(f).write_text(txt)
-          print("FIXED PURE GITHUB")
+              print(f"FIXED {f}")
+          print("FIXED ALL - GRADLE 8.13, KEYSTORE, getAbsolutePath, KOTLIN 2.0.21, Promise.kt")
           PY
       - name: Build DEBUG APK LOCALLY
         run: |
