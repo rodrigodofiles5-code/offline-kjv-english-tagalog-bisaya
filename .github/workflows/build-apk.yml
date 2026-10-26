@@ -15,9 +15,14 @@ jobs:
           java-version: '17'
       - name: Install
         run: npm install --legacy-peer-deps
-      - name: Prebuild fresh
+      - name: Prebuild
         run: npx expo prebuild --platform android --clean
-      - name: Build APK Debug
+      - name: FIX Line 14 bug
+        run: |
+          echo '{"project_info":{"project_number":"0","project_id":"dummy"}}' > android/app/google-services.json
+          touch google-services.json
+          ls android/app/
+      - name: Build Debug APK
         run: |
           cd android
           chmod +x gradlew
