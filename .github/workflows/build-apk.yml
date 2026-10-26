@@ -19,20 +19,23 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Remove old android folder
+        run: rm -rf android
+
       - name: Install deps
         run: npm install --legacy-peer-deps
 
-      - name: Prebuild Android locally
+      - name: Prebuild fresh android
         run: npx expo prebuild --platform android --clean --non-interactive
 
       - name: Create local.properties
         run: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
-      - name: Build APK locally
+      - name: Build DEBUG APK locally
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
