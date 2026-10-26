@@ -28,13 +28,11 @@ jobs:
       - name: Prebuild fresh android
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: Fix Gradle 8.6.1 + keystore
+      - name: Fix Gradle 8.10.2 + keystore
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
-          # Ito ang working version para sa KJV app mo - 8.6.1 lang
-          sed -i "s/gradle-.*-bin.zip/gradle-8.6.1-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
+          sed -i "s/gradle-.*-bin.zip/gradle-8.10.2-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
           cat android/gradle/wrapper/gradle-wrapper.properties
-          # Fix yung getAbsolutePath error dati
           python3 << 'PY'
           import pathlib
           p=pathlib.Path('android/app/build.gradle')
@@ -42,16 +40,14 @@ jobs:
           t=t.replace(".getAbsolutePath()", ".absolutePath")
           t=t.replace("signingConfig signingConfigs.release", "signingConfig signingConfigs.debug")
           p.write_text(t)
-          print("Patched build.gradle OK")
+          print("Patched OK")
           PY
-          cat android/app/build.gradle | head -n 40
 
       - name: Build DEBUG APK locally
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew clean
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
