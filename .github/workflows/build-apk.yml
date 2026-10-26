@@ -22,8 +22,9 @@ jobs:
         run: |
           rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps --force
-          npx expo install expo@~54.0.0 expo-modules-core@latest --fix --non-interactive --force
+          npm install expo@~54.0.0 expo-modules-core@latest --save --legacy-peer-deps --force
           npm install react-native-reanimated@4.1.0 react-native-worklets@0.5.1 react-native-screens@4.11.1 react-native-safe-area-context@5.4.0 --save --legacy-peer-deps --force
+          CI=1 npx expo install --fix
       - name: Prebuild
         run: npx expo prebuild --platform android --clean --non-interactive
       - name: FIX gradle keystore kotlin
