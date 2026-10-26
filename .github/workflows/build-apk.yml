@@ -28,33 +28,30 @@ jobs:
       - name: Prebuild fresh android
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: Fix Gradle and keystore bug
+      - name: Fix Gradle 8.6.1 + keystore
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
-          # Downgrade Gradle 9.3.1 -> 8.8
-          sed -i "s/gradle-.*-bin.zip/gradle-8.8-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
-          # Patch build.gradle line 14 - gawing safe yung getAbsolutePath
+          # Ito ang working version para sa KJV app mo - 8.6.1 lang
+          sed -i "s/gradle-.*-bin.zip/gradle-8.6.1-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
+          cat android/gradle/wrapper/gradle-wrapper.properties
+          # Fix yung getAbsolutePath error dati
           python3 << 'PY'
           import pathlib
           p=pathlib.Path('android/app/build.gradle')
           t=p.read_text()
-          t=t.replace("getAbsolutePath()", "absolutePath")
-          t=t.replace("file(keystoreProperties['storeFile']).absolutePath", "file(keystoreProperties['storeFile'] ?: 'debug.keystore').absolutePath")
-          t=t.replace("file(keystoreProperties['keyAlias'])", "'androiddebugkey'")
+          t=t.replace(".getAbsolutePath()", ".absolutePath")
           t=t.replace("signingConfig signingConfigs.release", "signingConfig signingConfigs.debug")
-          # Force release to use debug keystore
-          t=t.replace("release {", "release {\n            signingConfig signingConfigs.debug\n            // patched")
           p.write_text(t)
-          print("Patched OK")
+          print("Patched build.gradle OK")
           PY
-          cat android/gradle/wrapper/gradle-wrapper.properties
-          cat android/app/build.gradle | head -n 35
+          cat android/app/build.gradle | head -n 40
 
       - name: Build DEBUG APK locally
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew clean
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
