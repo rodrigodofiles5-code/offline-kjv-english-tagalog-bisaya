@@ -12,40 +12,32 @@ jobs:
         with: { node-version: 20, cache: npm }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
-
       - run: rm -rf android node_modules package-lock.json
-      - run: npm i --legacy-peer-deps --force && npm i react-native-reanimated@4.1.0 react-native-worklets@0.5.1 react-native-screens@4.11.1 react-native-safe-area-context@5.4.0 --save --legacy-peer-deps --force
+      - run: npm i --legacy-peer-deps --force
+      - run: npm i react-native-reanimated@4.1.0 react-native-worklets@0.5.1 react-native-screens@4.11.1 react-native-safe-area-context@5.4.0 --save --legacy-peer-deps --force
       - run: npx expo prebuild --platform android --clean --non-interactive
-
-      - name: FIX ALL GRADLE 8.13 ERRORS
+      - name: FIX ALL
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
           python3 << 'PY'
           import pathlib, re, glob
-          app = pathlib.Path('android/app/build.gradle')
-          txt = app.read_text()
-          # BURAHIN LAHAT NG SIGNING para hindi na mag error sa line 100-109
-          txt = re.sub(r'signingConfigs\s*\{.*?\n\s*\}\s*\n', '', txt, flags=re.DOTALL)
-          txt = re.sub(r'signingConfig\s+signingConfigs\..*', '', txt)
-          txt = txt.replace('.getAbsolutePath()','')
-          txt = txt.replace('keystoreProperties','// keystoreProperties')
-          app.write_text(txt)
-
-          b = pathlib.Path('android/build.gradle')
-          bt = b.read_text()
-          bt = re.sub(r"kotlinVersion.*", "kotlinVersion = '2.1.20'", bt)
-          if "2.1.20" not in bt:
-              bt = bt.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.1.20'; kspVersion = '2.1.20-1.0.31' }")
-          b.write_text(bt)
-
+          b = pathlib.Path('android/build.gradle').read_text()
+          b = re.sub(r"kotlinVersion.*", "kotlinVersion = '2.1.20'", b)
+          if "kspVersion" not in b:
+              b = b.replace("kotlinVersion = '2.1.20'", "kotlinVersion = '2.1.20'\n        kspVersion = '2.1.20-1.0.31'")
+          if "2.1.20" not in b:
+              b = b.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.1.20'; kspVersion = '2.1.20-1.0.31' }")
+          pathlib.Path('android/build.gradle').write_text(b)
           for f in glob.glob('node_modules/expo-modules-core/**/Promise.kt', recursive=True):
               t = pathlib.Path(f).read_text()
               if 'override fun reject' in t:
                   pathlib.Path(f).write_text(t.replace('override fun reject','fun reject'))
-          print("FIXED: No more SigningConfig error")
+          app = pathlib.Path('android/app/build.gradle')
+          txt = app.read_text().replace('.getAbsolutePath()','')
+          app.write_text(txt)
+          print("CLEAN FIX DONE")
           PY
-
       - run: cd android && chmod +x gradlew && ./gradlew clean && ./gradlew assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with: { name: offline-kjv-apk, path: android/app/build/outputs/apk/debug/app-debug.apk }
