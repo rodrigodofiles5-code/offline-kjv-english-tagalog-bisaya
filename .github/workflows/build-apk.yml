@@ -16,13 +16,23 @@ jobs:
           cache: npm
       - run: npm install --legacy-peer-deps
 
+      - run: npm install -g eas-cli
+
+      - name: Init EAS project if needed
+        run: |
+          if ! grep -q "projectId" app.json; then
+            echo "No projectId found, initializing EAS project..."
+            eas init --account rodrigodofiles --non-interactive || true
+          fi
+          cat app.json || cat app.config.js || echo "no app config"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
       - name: Create eas.json if missing
         run: |
           if [ ! -f eas.json ]; then
-            echo '{"cli":{"version":">= 5.9.0"},"build":{"preview":{"distribution":"internal","android":{"buildType":"apk"}}}}' > eas.json
+            echo '{"cli":{"version":">= 5.9.0","appVersionSource":"remote"},"build":{"preview":{"distribution":"internal","android":{"buildType":"apk"}}}}' > eas.json
           fi
-
-      - run: npm install -g eas-cli
 
       - name: Build APK
         run: eas build --platform android --profile preview --non-interactive --no-wait
