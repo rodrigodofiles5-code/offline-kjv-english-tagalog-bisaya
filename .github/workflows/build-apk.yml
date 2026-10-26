@@ -19,7 +19,7 @@ jobs:
       - name: Install
         run: |
           npm i --legacy-peer-deps
-          npm i react-native-worklets@0.4.1 react-native-reanimated@3.17.5 --save --legacy-peer-deps --force
+          npm i react-native-worklets@0.4.1 react-native-reanimated@3.17.5 @react-native-community/cli --save-dev --legacy-peer-deps --force
           npx expo install --fix -- --legacy-peer-deps
 
       - name: Prebuild
@@ -43,10 +43,10 @@ jobs:
           p.write_text(t)
           PY
 
-      - name: MANUAL BUNDLE - para hindi na Unable to load script
+      - name: MANUAL BUNDLE - offline KJV bundle
         run: |
           mkdir -p android/app/src/main/assets
-          npx react-native bundle --platform android --dev false --entry-file node_modules/expo/AppEntry.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res/
+          npx @react-native-community/cli bundle --platform android --dev false --entry-file node_modules/expo/AppEntry.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res/
 
       - name: Build Debug APK
         run: |
