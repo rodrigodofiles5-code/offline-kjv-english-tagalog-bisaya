@@ -26,22 +26,44 @@ jobs:
         run: |
           rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps --force
-          # Ito yung gitna - 0.8.0 pasok sa expo at sa reanimated
           npm install react-native-worklets@0.8.0 --save --legacy-peer-deps --force
-          echo "Worklets fixed to 0.8.0"
+          echo "Worklets 0.8.0 fixed - pasok sa expo at reanimated"
 
       - name: Prebuild fresh android
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: Fix Gradle 8.13
+      - name: Fix Gradle 8.13 + Fix getAbsolutePath null
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
+          
+          # Gumawa ng debug keystore kung wala
+          if [ ! -f android/app/debug.keystore ]; then
+            keytool -genkey -v -keystore android/app/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          
+          # Gumawa ng keystore.properties na may ABSOLUTE path
+          PWD=$(pwd)
+          echo "storeFile=$PWD/android/app/debug.keystore" > android/keystore.properties
+          echo "storePassword=android" >> android/keystore.properties
+          echo "keyAlias=androiddebugkey" >> android/keystore.properties
+          echo "keyPassword=android" >> android/keystore.properties
+          cat android/keystore.properties
+          
+          # I-patch ang build.gradle - tanggalin getAbsolutePath() on null
+          python3 << 'PY'
+          import pathlib
+          p = pathlib.Path('android/app/build.gradle')
+          t = p.read_text()
+          t = t.replace('.getAbsolutePath()', '')
+          if 'signingConfig signingConfigs.release' in t:
+              t = t.replace('signingConfig signingConfigs.release', 'signingConfig signingConfigs.debug')
+          p.write_text(t)
+          print("PATCHED line 14 - getAbsolutePath fixed")
+          PY
           cat android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Build DEBUG APK locally
-        env:
-          NODE_ENV: production
         run: |
           cd android
           chmod +x gradlew
