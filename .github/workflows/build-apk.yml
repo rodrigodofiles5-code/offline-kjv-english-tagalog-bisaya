@@ -13,43 +13,47 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
 
-      - name: Clean
-        run: rm -rf android node_modules package-lock.json
+      - run: rm -rf android node_modules package-lock.json
 
-      - name: Install deps (Expo SDK 53 compatible)
+      - name: Install Expo 53 + fix
         run: |
-          npm i --legacy-peer-deps --force
-          npm i expo@~53.0.12 expo-modules-core@2.2.3 react-native-reanimated@3.17.1 react-native-worklets@0.4.1 react-native-screens@4.11.1 react-native-safe-area-context@5.4.0 --save --legacy-peer-deps --force
+          npm i --legacy-peer-deps
+          npx expo install --fix -- --legacy-peer-deps
+          npm i expo@~53.0.20 expo-modules-core@2.3.13 @expo/config-plugins@10.0.0 --save --legacy-peer-deps
 
       - name: Prebuild
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: FIX Gradle + Kotlin for Expo 53
+      - name: FIX ALL - Gradle 8.13
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
-          # Expo 53 stable = Gradle 8.10.2 + Kotlin 2.0.21
-          sed -i "s/gradle-.*-bin.zip/gradle-8.10.2-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
+          sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
           python3 << 'PY'
           import pathlib, re, glob
-          # 1. Kotlin 2.0.21 para hindi mawala expo-module-gradle-plugin
-          b = pathlib.Path('android/build.gradle').read_text()
-          b = re.sub(r"kotlinVersion.*", "kotlinVersion = '2.0.21'", b)
-          b = re.sub(r"kspVersion.*", "kspVersion = '2.0.21-1.0.28'", b)
-          if "2.0.21" not in b:
-              b = b.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.0.21'; kspVersion = '2.0.21-1.0.28' }")
-          pathlib.Path('android/build.gradle').write_text(b)
+          # 1. Kotlin 2.1.20 para sa Gradle 8.13
+          f = pathlib.Path('android/build.gradle')
+          t = f.read_text()
+          t = re.sub(r"kotlinVersion.*", "kotlinVersion = '2.1.20'", t)
+          if "kspVersion" not in t:
+              t = t.replace("kotlinVersion = '2.1.20'", "kotlinVersion = '2.1.20'\n        kspVersion = '2.1.20-1.0.31'")
+          else:
+              t = re.sub(r"kspVersion.*", "kspVersion = '2.1.20-1.0.31'", t)
+          if "2.1.20" not in t:
+              t = t.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.1.20'; kspVersion = '2.1.20-1.0.31' }")
+          f.write_text(t)
 
-          # 2. Promise.kt fix - lahat ng file hanapin
-          for f in glob.glob('**/Promise.kt', recursive=True):
-              t = pathlib.Path(f).read_text()
-              if 'override fun reject' in t or 'override fun resolve' in t:
-                  pathlib.Path(f).write_text(t.replace('override fun reject','fun reject').replace('override fun resolve','fun resolve'))
-                  print(f"FIXED {f}")
+          # 2. Promise.kt - lahat ng file
+          for p in glob.glob('**/Promise.kt', recursive=True):
+              txt = pathlib.Path(p).read_text()
+              nt = txt.replace('override fun reject','fun reject').replace('override fun resolve','fun resolve')
+              if nt != txt:
+                  pathlib.Path(p).write_text(nt)
+                  print(f"FIXED {p}")
 
-          # 3. compileSdk fix para sa :expo project
+          # 3. getAbsolutePath
           app = pathlib.Path('android/app/build.gradle')
           app.write_text(app.read_text().replace('.getAbsolutePath()',''))
-          print("FIX DONE - Gradle 8.10.2 + Kotlin 2.0.21")
+          print("FIXED GRADLE 8.13 + PLUGIN OK")
           PY
 
       - name: Build APK
