@@ -27,37 +27,34 @@ jobs:
           rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps --force
           npx expo install --fix --non-interactive || true
-          # PLUS PLUS - LAHAT NG DATI ANDITO:
           npm install react-native-reanimated@4.1.0 react-native-worklets@0.5.1 react-native-screens@4.11.1 react-native-safe-area-context@5.4.0 --save --legacy-peer-deps --force
-          npm list react-native-reanimated react-native-worklets react-native-screens || true
 
       - name: Prebuild fresh android
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: PLUS PLUS FIX - Gradle 8.13 + keystore + getAbsolutePath + Kotlin 2.1.0
+      - name: PLUS PLUS FIX - Gradle 8.13 + keystore + getAbsolutePath + Kotlin 2.1.20
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
           
-          # PLUS PLUS 1: Gradle 8.13
+          # PLUS PLUS - Gradle 8.13
           cat android/gradle/wrapper/gradle-wrapper.properties
           
-          # PLUS PLUS 2: debug.keystore
+          # PLUS PLUS - debug.keystore
           if [ ! -f android/app/debug.keystore ]; then
             keytool -genkey -v -keystore android/app/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
           fi
           
-          # PLUS PLUS 3: keystore.properties ABSOLUTE PATH
+          # PLUS PLUS - keystore.properties ABSOLUTE PATH
           PWD=$(pwd)
           echo "storeFile=$PWD/android/app/debug.keystore" > android/keystore.properties
           echo "storePassword=android" >> android/keystore.properties
           echo "keyAlias=androiddebugkey" >> android/keystore.properties
           echo "keyPassword=android" >> android/keystore.properties
           
-          # PLUS PLUS 4: getAbsolutePath fix + Kotlin fix + BAGO - expo-modules-core Kotlin fix
           python3 << 'PY'
           import pathlib, re
-          # Fix app/build.gradle - getAbsolutePath
+          # PLUS PLUS - getAbsolutePath fix
           p = pathlib.Path('android/app/build.gradle')
           t = p.read_text()
           t = t.replace('.getAbsolutePath()', '')
@@ -80,20 +77,17 @@ jobs:
           t = re.sub(r'signingConfigs\s*\{.*?release.*?\{.*?\}.*?\n\s*\}', safe_signing, t, flags=re.DOTALL)
           t = t.replace('signingConfig signingConfigs.release', 'signingConfig signingConfigs.debug')
           p.write_text(t)
-          print("FIXED app/build.gradle - getAbsolutePath")
           
-          # Fix android/build.gradle - force Kotlin 2.1.0 for expo-modules-core:compileDebugKotlin
+          # PLUS PLUS - BAGO - Kotlin 2.1.20 - fix sa error mo na "minimum is 2.1.20"
           b = pathlib.Path('android/build.gradle')
           bt = b.read_text()
-          # Force kotlinVersion to 2.1.0 - fix for :expo-modules-core:compileDebugKotlin error mo
-          if 'kotlinVersion' in bt:
-              bt = re.sub(r"kotlinVersion\s*=\s*['\"][^'\"]+['\"]", "kotlinVersion = '2.1.0'", bt)
-          else:
-              # If not found, inject ext block
-              bt = bt.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.1.0' }")
+          bt = re.sub(r"kotlinVersion\s*=\s*['\"][^'\"]+['\"]", "kotlinVersion = '2.1.20'", bt)
+          if "kotlinVersion = '2.1.20'" not in bt:
+              bt = bt.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.1.20' }")
+              bt = re.sub(r"kotlinVersion\s*=\s*['\"][^'\"]+['\"]", "kotlinVersion = '2.1.20'", bt)
           b.write_text(bt)
-          print("FIXED android/build.gradle - kotlinVersion 2.1.0")
-          print(b.read_text()[:1000])
+          print("FIXED - kotlinVersion 2.1.20")
+          print(b.read_text()[:1200])
           PY
 
       - name: Build DEBUG APK locally
