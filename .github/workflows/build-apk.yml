@@ -16,16 +16,16 @@ jobs:
       - name: Deep Clean
         run: rm -rf android node_modules package-lock.json ~/.gradle android/app/build android/build
 
-      - name: Install Correct versions for RN 0.79 + SDK53
+      - name: Install
         run: |
           npm i --legacy-peer-deps
           npm i react-native-worklets@0.4.1 react-native-reanimated@3.17.5 --save --legacy-peer-deps --force
           npx expo install --fix -- --legacy-peer-deps
 
-      - name: Prebuild clean
+      - name: Prebuild
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: FIX Gradle 8.13 + Kotlin 2.1.20 + Hermes
+      - name: FIX Gradle 8.13 + Hermes File.plus
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
@@ -36,23 +36,19 @@ jobs:
           b = re.sub(r"kspVersion.*", "kspVersion = '2.1.20-2.0.1'", b)
           b = re.sub(r"com.android.tools.build:gradle:[0-9.]+", "com.android.tools.build:gradle:8.8.2", b)
           pathlib.Path('android/build.gradle').write_text(b)
-
           p = pathlib.Path('android/app/build.gradle')
           t = p.read_text()
-          # Fix File + String na cause ng white screen dati
-          t = re.sub(r'new File\(([^)]+)\)\s*\+\s*"/sdks/hermesc/%OS-BIN%/hermesc"', r'new File(\1, "sdks/hermesc/%OS-BIN%/hermesc")', t)
-          t = re.sub(r'(\w+)\s*\+\s*"/sdks/hermesc', r'new File(\1, "sdks/hermesc', t)
-          if '+ "/sdks' in t:
-              t = t.replace('+ "/sdks', ', "sdks')
+          if "File.metaClass.plus" not in t:
+              t = "File.metaClass.plus = { String path -> new File(delegate, path) }\n" + t
           p.write_text(t)
-          print("FIXED for Gradle 8.13")
           PY
 
-      - name: Build Debug APK - proven path
+      - name: Build DEBUG with JS Bundle packaged
         run: |
           cd android
           chmod +x gradlew
           ./gradlew clean
+          ./gradlew :app:bundleDebugJsAndAssets
           ./gradlew assembleDebug --stacktrace
 
       - uses: actions/upload-artifact@v4
