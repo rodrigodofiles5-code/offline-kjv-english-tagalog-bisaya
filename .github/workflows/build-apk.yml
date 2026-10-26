@@ -13,51 +13,51 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
 
-      - run: rm -rf android node_modules package-lock.json
+      - name: Deep Clean
+        run: |
+          rm -rf android node_modules package-lock.json
+          rm -rf ~/.gradle/caches ~/.gradle/wrapper
 
-      - name: Install Expo 53 + fix
+      - name: Install with Expo 53 official versions
         run: |
           npm i --legacy-peer-deps
-          npx expo install --fix -- --legacy-peer-deps
-          npm i expo@~53.0.20 expo-modules-core@2.3.13 @expo/config-plugins@10.0.0 --save --legacy-peer-deps
+          npm i expo@~53.0.20 expo-modules-core@2.2.3 @react-native/gradle-plugin@0.77.1 --save --legacy-peer-deps --force
 
       - name: Prebuild
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: FIX ALL - Gradle 8.13
+      - name: FIX to Expo Official Compatible Versions
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
-          sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
+          # Expo 53 = Gradle 8.8 + AGP 8.6 + Kotlin 1.9.24 - ito ang hindi magka-conflict
+          sed -i "s/gradle-.*-bin.zip/gradle-8.8-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
           python3 << 'PY'
           import pathlib, re, glob
-          # 1. Kotlin 2.1.20 para sa Gradle 8.13
-          f = pathlib.Path('android/build.gradle')
-          t = f.read_text()
-          t = re.sub(r"kotlinVersion.*", "kotlinVersion = '2.1.20'", t)
-          if "kspVersion" not in t:
-              t = t.replace("kotlinVersion = '2.1.20'", "kotlinVersion = '2.1.20'\n        kspVersion = '2.1.20-1.0.31'")
-          else:
-              t = re.sub(r"kspVersion.*", "kspVersion = '2.1.20-1.0.31'", t)
-          if "2.1.20" not in t:
-              t = t.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.1.20'; kspVersion = '2.1.20-1.0.31' }")
-          f.write_text(t)
 
-          # 2. Promise.kt - lahat ng file
+          # 1. Force Kotlin 1.9.24 sa buong project para tugma sa expo-module-gradle-plugin
+          build = pathlib.Path('android/build.gradle').read_text()
+          build = re.sub(r"kotlinVersion.*", "kotlinVersion = '1.9.24'", build)
+          build = re.sub(r"kspVersion.*", "kspVersion = '1.9.24-1.0.20'", build)
+          if "1.9.24" not in build:
+              build = build.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '1.9.24'; kspVersion = '1.9.24-1.0.20' }")
+          pathlib.Path('android/build.gradle').write_text(build)
+
+          # 2. Promise.kt fix
           for p in glob.glob('**/Promise.kt', recursive=True):
               txt = pathlib.Path(p).read_text()
-              nt = txt.replace('override fun reject','fun reject').replace('override fun resolve','fun resolve')
-              if nt != txt:
-                  pathlib.Path(p).write_text(nt)
+              if 'override fun reject' in txt:
+                  pathlib.Path(p).write_text(txt.replace('override fun reject','fun reject').replace('override fun resolve','fun resolve'))
                   print(f"FIXED {p}")
 
-          # 3. getAbsolutePath
-          app = pathlib.Path('android/app/build.gradle')
-          app.write_text(app.read_text().replace('.getAbsolutePath()',''))
-          print("FIXED GRADLE 8.13 + PLUGIN OK")
+          # 3. Alisin .getAbsolutePath() na sumisira sa line 100
+          app = pathlib.Path('android/app/build.gradle').read_text().replace('.getAbsolutePath()','')
+          pathlib.Path('android/app/build.gradle').write_text(app)
+
+          print("FIXED: Now using Kotlin 1.9.24 + Gradle 8.8")
           PY
 
       - name: Build APK
-        run: cd android && chmod +x gradlew && ./gradlew clean && ./gradlew assembleDebug --stacktrace
+        run: cd android && chmod +x gradlew && ./gradlew clean && ./gradlew assembleDebug --stacktrace --no-daemon
 
       - uses: actions/upload-artifact@v4
         with: { name: offline-kjv-apk, path: android/app/build/outputs/apk/debug/app-debug.apk }
