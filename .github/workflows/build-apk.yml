@@ -18,14 +18,14 @@ jobs:
           java-version: 17
       - name: Remove old android
         run: rm -rf android
-      - name: Install deps PURE GITHUB
+      - name: Install deps PURE GITHUB LAHAT
         run: |
           rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps --force
           npm install react-native-reanimated@4.1.0 react-native-worklets@0.5.1 react-native-screens@4.11.1 react-native-safe-area-context@5.4.0 --save --legacy-peer-deps --force
       - name: Prebuild PURE LOCAL
         run: npx expo prebuild --platform android --clean --non-interactive
-      - name: FIX gradle keystore kotlin Promise
+      - name: FIX LAHAT - gradle keystore getAbsolutePath kotlin screens worklets reanimated Promise
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
@@ -70,13 +70,17 @@ jobs:
           if "kspVersion" not in bt:
               bt=re.sub(r"(kotlinVersion\s*=\s*'2\.0\.21')",r"\1\n        kspVersion = '2.0.21-1.0.28'",bt)
           b.write_text(bt)
-          # DIRECT FIX SA Promise.kt - tanggalin ang 'override' na nagpapa-fail
+          # CRITICAL FIX para sa error mo: expo-modules-core:compileDebugKotlin
           for f in glob.glob('node_modules/expo-modules-core/**/Promise.kt', recursive=True):
               txt=pathlib.Path(f).read_text()
               txt=txt.replace('override fun reject','fun reject')
               pathlib.Path(f).write_text(txt)
-              print(f"FIXED {f}")
-          print("FIXED ALL - GRADLE 8.13, KEYSTORE, getAbsolutePath, KOTLIN 2.0.21, Promise.kt")
+              print(f"FIXED Promise.kt {f}")
+          for f in glob.glob('node_modules/expo-modules-core/android/build.gradle'):
+              txt=pathlib.Path(f).read_text()
+              txt=txt.replace("2.1.20","2.0.21")
+              pathlib.Path(f).write_text(txt)
+          print("FIXED ALL - PURE GITHUB")
           PY
       - name: Build DEBUG APK LOCALLY
         run: |
