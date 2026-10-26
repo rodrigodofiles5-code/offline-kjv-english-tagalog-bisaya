@@ -22,47 +22,44 @@ jobs:
       - name: Remove old android folder
         run: rm -rf android
 
-      - name: Install deps + PLUS PLUS FIX - LAHAT NG DATI + BAGO
+      - name: Install deps + PLUS PLUS FIX - worklets + screens + reanimated
         run: |
           rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps --force
-          # PLUS PLUS LAHAT NG DATI ANDITO PA RIN:
-          # 1. worklets 0.8.0 - gitna, pasok sa expo at reanimated dati
-          # 2. screens 4.11.1 - fix sa React.ElementRef
-          # 3. safe-area-context
-          # BAGO NGAYON - PLUS PLUS 4:
-          # 4. reanimated 4.1.0 - fix sa TRACE_TAG_REACT_JAVA_BRIDGE error mo ngayon
           npx expo install --fix --non-interactive || true
+          # PLUS PLUS - LAHAT NG DATI ANDITO:
           npm install react-native-reanimated@4.1.0 react-native-worklets@0.5.1 react-native-screens@4.11.1 react-native-safe-area-context@5.4.0 --save --legacy-peer-deps --force
-          echo "PLUS PLUS FIXED:"
           npm list react-native-reanimated react-native-worklets react-native-screens || true
 
       - name: Prebuild fresh android
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: PLUS PLUS FIX - Gradle 8.13 + keystore + getAbsolutePath - ANDITO PA RIN
+      - name: PLUS PLUS FIX - Gradle 8.13 + keystore + getAbsolutePath + Kotlin 2.1.0
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
+          
+          # PLUS PLUS 1: Gradle 8.13
           cat android/gradle/wrapper/gradle-wrapper.properties
           
+          # PLUS PLUS 2: debug.keystore
           if [ ! -f android/app/debug.keystore ]; then
             keytool -genkey -v -keystore android/app/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
           fi
-          ls -lh android/app/debug.keystore
           
+          # PLUS PLUS 3: keystore.properties ABSOLUTE PATH
           PWD=$(pwd)
           echo "storeFile=$PWD/android/app/debug.keystore" > android/keystore.properties
           echo "storePassword=android" >> android/keystore.properties
           echo "keyAlias=androiddebugkey" >> android/keystore.properties
           echo "keyPassword=android" >> android/keystore.properties
-          cat android/keystore.properties
           
+          # PLUS PLUS 4: getAbsolutePath fix + Kotlin fix + BAGO - expo-modules-core Kotlin fix
           python3 << 'PY'
           import pathlib, re
+          # Fix app/build.gradle - getAbsolutePath
           p = pathlib.Path('android/app/build.gradle')
           t = p.read_text()
-          print("BEFORE:", "getAbsolutePath" in t)
           t = t.replace('.getAbsolutePath()', '')
           safe_signing = """
           signingConfigs {
@@ -83,7 +80,20 @@ jobs:
           t = re.sub(r'signingConfigs\s*\{.*?release.*?\{.*?\}.*?\n\s*\}', safe_signing, t, flags=re.DOTALL)
           t = t.replace('signingConfig signingConfigs.release', 'signingConfig signingConfigs.debug')
           p.write_text(t)
-          print("AFTER:", "getAbsolutePath" in t)
+          print("FIXED app/build.gradle - getAbsolutePath")
+          
+          # Fix android/build.gradle - force Kotlin 2.1.0 for expo-modules-core:compileDebugKotlin
+          b = pathlib.Path('android/build.gradle')
+          bt = b.read_text()
+          # Force kotlinVersion to 2.1.0 - fix for :expo-modules-core:compileDebugKotlin error mo
+          if 'kotlinVersion' in bt:
+              bt = re.sub(r"kotlinVersion\s*=\s*['\"][^'\"]+['\"]", "kotlinVersion = '2.1.0'", bt)
+          else:
+              # If not found, inject ext block
+              bt = bt.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.1.0' }")
+          b.write_text(bt)
+          print("FIXED android/build.gradle - kotlinVersion 2.1.0")
+          print(b.read_text()[:1000])
           PY
 
       - name: Build DEBUG APK locally
