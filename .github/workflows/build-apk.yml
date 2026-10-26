@@ -17,11 +17,14 @@ jobs:
         run: npm install --legacy-peer-deps
       - name: Prebuild
         run: npx expo prebuild --platform android --clean
-      - name: FIX Line 14 bug
+      - name: PATCH Line 14 fix
         run: |
-          echo '{"project_info":{"project_number":"0","project_id":"dummy"}}' > android/app/google-services.json
-          touch google-services.json
-          ls android/app/
+          echo "PATCHING android/app/build.gradle..."
+          sed -n '1,20p' android/app/build.gradle
+          sed -i "s|def reactNativeDir.*|def reactNativeDir = new File(\"$GITHUB_WORKSPACE/node_modules/react-native\")|" android/app/build.gradle
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          echo "PATCHED:"
+          sed -n '1,20p' android/app/build.gradle
       - name: Build Debug APK
         run: |
           cd android
