@@ -9,88 +9,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+        with: { node-version: 20, cache: npm }
       - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-      - name: Remove old android
-        run: rm -rf android
-      - name: Install deps PURE GITHUB LAHAT
-        run: |
-          rm -rf node_modules package-lock.json
-          npm install --legacy-peer-deps --force
-          npm install react-native-reanimated@4.1.0 react-native-worklets@0.5.1 react-native-screens@4.11.1 react-native-safe-area-context@5.4.0 --save --legacy-peer-deps --force
-      - name: Prebuild PURE LOCAL
-        run: npx expo prebuild --platform android --clean --non-interactive
-      - name: FIX LAHAT - gradle keystore getAbsolutePath kotlin screens worklets reanimated Promise
-        run: |
+        with: { distribution: temurin, java-version: 17 }
+      - run: rm -rf android node_modules package-lock.json
+      - run: npm i --legacy-peer-deps --force && npm i react-native-reanimated@4.1.0 react-native-worklets@0.5.1 react-native-screens@4.11.1 react-native-safe-area-context@5.4.0 --save --legacy-peer-deps --force
+      - run: npx expo prebuild --platform android --clean --non-interactive
+      - run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
-          if [ ! -f android/app/debug.keystore ]; then
-            keytool -genkey -v -keystore android/app/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
-          fi
-          PWD=$(pwd)
-          echo "storeFile=$PWD/android/app/debug.keystore" > android/keystore.properties
-          echo "storePassword=android" >> android/keystore.properties
-          echo "keyAlias=androiddebugkey" >> android/keystore.properties
-          echo "keyPassword=android" >> android/keystore.properties
+          keytool -genkey -v -keystore android/app/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US" || true
           python3 << 'PY'
-          import pathlib, re, glob
-          p=pathlib.Path('android/app/build.gradle')
-          t=p.read_text()
-          t=t.replace('.getAbsolutePath()','')
-          safe="""
-          signingConfigs {
-                  debug {
-                      storeFile file('debug.keystore')
-                      storePassword 'android'
-                      keyAlias 'androiddebugkey'
-                      keyPassword 'android'
-                  }
-                  release {
-                      storeFile file('debug.keystore')
-                      storePassword 'android'
-                      keyAlias 'androiddebugkey'
-                      keyPassword 'android'
-                  }
-              }
-          """
-          t=re.sub(r'signingConfigs\s*\{.*?release.*?\{.*?\}.*?\n\s*\}',safe,t,flags=re.DOTALL)
-          t=t.replace('signingConfig signingConfigs.release','signingConfig signingConfigs.debug')
-          p.write_text(t)
-          b=pathlib.Path('android/build.gradle')
-          bt=b.read_text()
-          bt=re.sub(r"kotlinVersion\s*=\s*['\"][^'\"]+['\"]","kotlinVersion = '2.0.21'",bt)
-          if "kotlinVersion = '2.0.21'" not in bt:
-              bt=bt.replace('buildscript {',"buildscript {\n    ext { kotlinVersion = '2.0.21' }")
-          bt=re.sub(r"kspVersion\s*=\s*['\"][^'\"]+['\"]","kspVersion = '2.0.21-1.0.28'",bt)
-          if "kspVersion" not in bt:
-              bt=re.sub(r"(kotlinVersion\s*=\s*'2\.0\.21')",r"\1\n        kspVersion = '2.0.21-1.0.28'",bt)
-          b.write_text(bt)
-          # CRITICAL FIX para sa error mo: expo-modules-core:compileDebugKotlin
-          for f in glob.glob('node_modules/expo-modules-core/**/Promise.kt', recursive=True):
-              txt=pathlib.Path(f).read_text()
-              txt=txt.replace('override fun reject','fun reject')
-              pathlib.Path(f).write_text(txt)
-              print(f"FIXED Promise.kt {f}")
-          for f in glob.glob('node_modules/expo-modules-core/android/build.gradle'):
-              txt=pathlib.Path(f).read_text()
-              txt=txt.replace("2.1.20","2.0.21")
-              pathlib.Path(f).write_text(txt)
-          print("FIXED ALL - PURE GITHUB")
+          import pathlib,re,glob
+          p=pathlib.Path('android/app/build.gradle'); t=p.read_text().replace('.getAbsolutePath()','')
+          t=re.sub(r'signingConfigs\s*\{.*?\n\s*\}.*?\n\s*\}',"signingConfigs { debug { storeFile file('debug.keystore'); storePassword 'android'; keyAlias 'androiddebugkey'; keyPassword 'android' } release { storeFile file('debug.keystore'); storePassword 'android'; keyAlias 'androiddebugkey'; keyPassword 'android' } }",t,flags=re.DOTALL)
+          p.write_text(t.replace('signingConfigs.release','signingConfigs.debug'))
+          b=pathlib.Path('android/build.gradle'); bt=b.read_text()
+          bt=re.sub(r"kotlinVersion.*","kotlinVersion = '2.1.20'",bt); bt=re.sub(r"kspVersion.*","kspVersion = '2.1.20-1.0.31'",bt)
+          if "2.1.20" not in bt: bt=bt.replace('buildscript {',"buildscript {\n    ext { kotlinVersion = '2.1.20'; kspVersion = '2.1.20-1.0.31' }")
+          pathlib.Path('android/build.gradle').write_text(bt)
+          for f in glob.glob('node_modules/expo-modules-core/**/Promise.kt',recursive=True):
+            txt=pathlib.Path(f).read_text().replace('override fun reject','fun reject'); pathlib.Path(f).write_text(txt)
           PY
-      - name: Build DEBUG APK LOCALLY
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew clean
-          ./gradlew assembleDebug --stacktrace
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: offline-kjv-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+      - run: cd android && chmod +x gradlew && ./gradlew clean && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with: { name: offline-kjv-apk, path: android/app/build/outputs/apk/debug/app-debug.apk }
         if: always()
