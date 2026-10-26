@@ -12,26 +12,41 @@ jobs:
         with: { node-version: 20, cache: npm }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
+
       - run: rm -rf android node_modules package-lock.json
       - run: npm i --legacy-peer-deps --force && npm i react-native-reanimated@4.1.0 react-native-worklets@0.5.1 react-native-screens@4.11.1 react-native-safe-area-context@5.4.0 --save --legacy-peer-deps --force
       - run: npx expo prebuild --platform android --clean --non-interactive
-      - run: |
+
+      - name: FIX ALL GRADLE 8.13 ERRORS
+        run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
-          keytool -genkey -v -keystore android/app/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US" || true
           python3 << 'PY'
-          import pathlib,re,glob
-          p=pathlib.Path('android/app/build.gradle'); t=p.read_text().replace('.getAbsolutePath()','')
-          t=re.sub(r'signingConfigs\s*\{.*?\n\s*\}.*?\n\s*\}',"signingConfigs { debug { storeFile file('debug.keystore'); storePassword 'android'; keyAlias 'androiddebugkey'; keyPassword 'android' } release { storeFile file('debug.keystore'); storePassword 'android'; keyAlias 'androiddebugkey'; keyPassword 'android' } }",t,flags=re.DOTALL)
-          p.write_text(t.replace('signingConfigs.release','signingConfigs.debug'))
-          b=pathlib.Path('android/build.gradle'); bt=b.read_text()
-          bt=re.sub(r"kotlinVersion.*","kotlinVersion = '2.1.20'",bt); bt=re.sub(r"kspVersion.*","kspVersion = '2.1.20-1.0.31'",bt)
-          if "2.1.20" not in bt: bt=bt.replace('buildscript {',"buildscript {\n    ext { kotlinVersion = '2.1.20'; kspVersion = '2.1.20-1.0.31' }")
-          pathlib.Path('android/build.gradle').write_text(bt)
-          for f in glob.glob('node_modules/expo-modules-core/**/Promise.kt',recursive=True):
-            txt=pathlib.Path(f).read_text().replace('override fun reject','fun reject'); pathlib.Path(f).write_text(txt)
+          import pathlib, re, glob
+          app = pathlib.Path('android/app/build.gradle')
+          txt = app.read_text()
+          # BURAHIN LAHAT NG SIGNING para hindi na mag error sa line 100-109
+          txt = re.sub(r'signingConfigs\s*\{.*?\n\s*\}\s*\n', '', txt, flags=re.DOTALL)
+          txt = re.sub(r'signingConfig\s+signingConfigs\..*', '', txt)
+          txt = txt.replace('.getAbsolutePath()','')
+          txt = txt.replace('keystoreProperties','// keystoreProperties')
+          app.write_text(txt)
+
+          b = pathlib.Path('android/build.gradle')
+          bt = b.read_text()
+          bt = re.sub(r"kotlinVersion.*", "kotlinVersion = '2.1.20'", bt)
+          if "2.1.20" not in bt:
+              bt = bt.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.1.20'; kspVersion = '2.1.20-1.0.31' }")
+          b.write_text(bt)
+
+          for f in glob.glob('node_modules/expo-modules-core/**/Promise.kt', recursive=True):
+              t = pathlib.Path(f).read_text()
+              if 'override fun reject' in t:
+                  pathlib.Path(f).write_text(t.replace('override fun reject','fun reject'))
+          print("FIXED: No more SigningConfig error")
           PY
-      - run: cd android && chmod +x gradlew && ./gradlew clean && ./gradlew assembleDebug
+
+      - run: cd android && chmod +x gradlew && ./gradlew clean && ./gradlew assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with: { name: offline-kjv-apk, path: android/app/build/outputs/apk/debug/app-debug.apk }
         if: always()
