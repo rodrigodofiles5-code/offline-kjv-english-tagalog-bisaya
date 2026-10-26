@@ -25,13 +25,13 @@ jobs:
       - name: Prebuild
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: FIX - Gradle 8.10.2 + File.plus fix
+      - name: FIX - File.plus final
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.10.2-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
           python3 << 'PY'
           import pathlib, re
-          # 1. Kotlin + AGP
+          # Kotlin + AGP
           b = pathlib.Path('android/build.gradle').read_text()
           b = re.sub(r"kotlinVersion.*", "kotlinVersion = '2.0.21'", b)
           b = re.sub(r"kspVersion.*", "kspVersion = '2.0.21-1.0.28'", b)
@@ -40,18 +40,17 @@ jobs:
               b = b.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.0.21'; kspVersion = '2.0.21-1.0.28' }")
           pathlib.Path('android/build.gradle').write_text(b)
 
-          # 2. FIX File.plus() error sa app/build.gradle
-          app_path = pathlib.Path('android/app/build.gradle')
-          txt = app_path.read_text()
-          # Ito yung sumisira: File + String
-          txt = txt.replace('+ "/sdks/hermesc/%OS-BIN%/hermesc"', '.absolutePath + "/sdks/hermesc/%OS-BIN%/hermesc"')
-          txt = txt.replace('+ "/sdks/hermesc/%OS-BIN%/hermesc"', '.absolutePath + "/sdks/hermesc/%OS-BIN%/hermesc"')
-          # generic fix: any File variable + "/sdks"
-          txt = re.sub(r'(\w+)\s*\+\s*"/sdks/hermesc', r'\1.absolutePath + "/sdks/hermesc', txt)
-          txt = re.sub(r'(\w+)\s*\+\s*"/sdks', r'\1.absolutePath + "/sdks', txt)
-          # alternative: kung may natirang .getAbsolutePath() na tinanggal dati, ibalik sa absolutePath form
-          pathlib.Path('android/app/build.gradle').write_text(txt)
-          print("FIXED File.plus")
+          # Fix app/build.gradle - File.plus
+          p = pathlib.Path('android/app/build.gradle')
+          t = p.read_text()
+          # 1. ibalik yung mga na-absolutePath dati na nasira
+          t = t.replace('.absolutePath + "/sdks', '+ "/sdks')
+          # 2. tamang fix: toString() gumagana sa File at String pareho
+          t = re.sub(r'\+\s*"/sdks/hermesc/%OS-BIN%/hermesc"', '.toString() + "/sdks/hermesc/%OS-BIN%/hermesc"', t)
+          t = re.sub(r'(\w+)\s*\+\s*"/sdks/hermesc', r'\1.toString() + "/sdks/hermesc', t)
+          t = re.sub(r'(\w+)\s*\+\s*"/sdks', r'\1.toString() + "/sdks', t)
+          p.write_text(t)
+          print("FIXED with toString()")
           PY
 
       - name: Build APK
