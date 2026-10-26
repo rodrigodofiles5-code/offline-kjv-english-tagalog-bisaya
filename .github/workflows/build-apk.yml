@@ -16,46 +16,45 @@ jobs:
       - name: Deep Clean
         run: rm -rf android node_modules package-lock.json ~/.gradle android/app/build android/build
 
-      - name: Install - Correct versions for RN 0.79.6
+      - name: Install with worklets - needed for runtime
         run: |
           npm i --legacy-peer-deps
           npm i react-native-worklets@0.4.1 react-native-reanimated@3.17.5 --save --legacy-peer-deps --force
-          npx expo install expo@~53.0.20 --fix -- --legacy-peer-deps
           npx expo install --fix -- --legacy-peer-deps
 
       - name: Prebuild clean
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: FIX - Hermes File.plus + Gradle 8.10.2
+      - name: FIX Hermes + Gradle
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.10.2-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
           python3 << 'PY'
           import pathlib, re
-          # 1. Kotlin + AGP fix
           b = pathlib.Path('android/build.gradle').read_text()
           b = re.sub(r"kotlinVersion.*", "kotlinVersion = '2.0.21'", b)
           b = re.sub(r"kspVersion.*", "kspVersion = '2.0.21-1.0.28'", b)
           b = re.sub(r"com.android.tools.build:gradle:[0-9.]+", "com.android.tools.build:gradle:8.7.3", b)
-          if "2.0.21" not in b:
-              b = b.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.0.21'; kspVersion = '2.0.21-1.0.28' }")
           pathlib.Path('android/build.gradle').write_text(b)
 
-          # 2. TAMANG FIX sa File.plus - lagyan ng metaClass sa taas ng file
           p = pathlib.Path('android/app/build.gradle')
           t = p.read_text()
-          # tanggalin mga maling fix dati
-          t = t.replace('.toString() + "/sdks', '+ "/sdks')
-          t = t.replace('.absolutePath + "/sdks', '+ "/sdks')
-          if "File.metaClass.plus" not in t:
-              t = "File.metaClass.plus = { String s -> new File(delegate, s) }\n" + t
+          # TAMA na fix - new File() hindi toString()
+          t = re.sub(r'new File\(([^)]+)\)\s*\+\s*"/sdks/hermesc/%OS-BIN%/hermesc"', r'new File(\1, "sdks/hermesc/%OS-BIN%/hermesc")', t)
+          t = re.sub(r'(\w+)\s*\+\s*"/sdks/hermesc', r'new File(\1, "sdks/hermesc', t)
+          if '+ "/sdks' in t:
+              t = t.replace('+ "/sdks', ', "sdks')
           p.write_text(t)
-          print("FIXED with metaClass")
+          print(t[ t.find("hermesc"): t.find("hermesc")+120 ])
           PY
 
-      - name: Build Release APK - para buo JS bundle
-        run: cd android && chmod +x gradlew && ./gradlew clean && ./gradlew assembleRelease --stacktrace
+      - name: Build Debug APK only - proven SUCCESS 18m
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew clean
+          ./gradlew assembleDebug --stacktrace
 
       - uses: actions/upload-artifact@v4
-        with: { name: offline-kjv-apk-release, path: android/app/build/outputs/apk/release/app-release.apk }
+        with: { name: offline-kjv-apk, path: android/app/build/outputs/apk/debug/app-debug.apk }
         if: always()
