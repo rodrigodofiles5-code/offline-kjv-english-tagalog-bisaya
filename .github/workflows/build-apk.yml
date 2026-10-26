@@ -28,20 +28,12 @@ jobs:
       - name: Prebuild fresh android
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: Fix Gradle 8.10.2 + keystore
+      - name: Fix to Gradle 8.13 - REQUIRED
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
-          sed -i "s/gradle-.*-bin.zip/gradle-8.10.2-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
+          sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
           cat android/gradle/wrapper/gradle-wrapper.properties
-          python3 << 'PY'
-          import pathlib
-          p=pathlib.Path('android/app/build.gradle')
-          t=p.read_text()
-          t=t.replace(".getAbsolutePath()", ".absolutePath")
-          t=t.replace("signingConfig signingConfigs.release", "signingConfig signingConfigs.debug")
-          p.write_text(t)
-          print("Patched OK")
-          PY
+          echo "Fixed to 8.13"
 
       - name: Build DEBUG APK locally
         run: |
