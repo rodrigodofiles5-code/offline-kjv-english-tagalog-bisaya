@@ -22,52 +22,61 @@ jobs:
       - name: Remove old android folder
         run: rm -rf android
 
-      - name: Install deps + FIX worklets 0.8.0
+      - name: Install deps + PLUS PLUS FIX - worklets + screens + reanimated
         run: |
           rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps --force
-          npm install react-native-worklets@0.8.0 --save --legacy-peer-deps --force
-          echo "Worklets 0.8.0 fixed - pasok sa expo at reanimated"
+          # PLUS PLUS - LAHAT NG FIX ANDITO - WALANG TINANGGAL
+          npx expo install --fix --non-interactive || true
+          npm install react-native-worklets@0.8.0 react-native-screens@4.11.1 react-native-safe-area-context@5.4.0 react-native-reanimated@3.17.4 --save --legacy-peer-deps --force
+          npm list react-native-worklets react-native-screens
 
       - name: Prebuild fresh android
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: Fix Gradle 8.13 + Fix getAbsolutePath null
+      - name: PLUS PLUS FIX - Gradle 8.13 + keystore + getAbsolutePath
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
-          
-          # Gumawa ng debug keystore kung wala
           if [ ! -f android/app/debug.keystore ]; then
             keytool -genkey -v -keystore android/app/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
           fi
-          
-          # Gumawa ng keystore.properties na may ABSOLUTE path
           PWD=$(pwd)
           echo "storeFile=$PWD/android/app/debug.keystore" > android/keystore.properties
           echo "storePassword=android" >> android/keystore.properties
           echo "keyAlias=androiddebugkey" >> android/keystore.properties
           echo "keyPassword=android" >> android/keystore.properties
-          cat android/keystore.properties
-          
-          # I-patch ang build.gradle - tanggalin getAbsolutePath() on null
           python3 << 'PY'
-          import pathlib
+          import pathlib, re
           p = pathlib.Path('android/app/build.gradle')
           t = p.read_text()
           t = t.replace('.getAbsolutePath()', '')
-          if 'signingConfig signingConfigs.release' in t:
-              t = t.replace('signingConfig signingConfigs.release', 'signingConfig signingConfigs.debug')
+          safe_signing = """
+          signingConfigs {
+                  debug {
+                      storeFile file('debug.keystore')
+                      storePassword 'android'
+                      keyAlias 'androiddebugkey'
+                      keyPassword 'android'
+                  }
+                  release {
+                      storeFile file('debug.keystore')
+                      storePassword 'android'
+                      keyAlias 'androiddebugkey'
+                      keyPassword 'android'
+                  }
+              }
+          """
+          t = re.sub(r'signingConfigs\s*\{.*?release.*?\{.*?\}.*?\n\s*\}', safe_signing, t, flags=re.DOTALL)
+          t = t.replace('signingConfig signingConfigs.release', 'signingConfig signingConfigs.debug')
           p.write_text(t)
-          print("PATCHED line 14 - getAbsolutePath fixed")
           PY
-          cat android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Build DEBUG APK locally
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
