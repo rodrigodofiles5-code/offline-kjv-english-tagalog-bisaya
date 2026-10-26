@@ -25,7 +25,7 @@ jobs:
       - name: Prebuild
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: FIX Gradle 8.13 + Hermes File.plus
+      - name: FIX Gradle 8.13 + Hermes
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
@@ -43,12 +43,16 @@ jobs:
           p.write_text(t)
           PY
 
-      - name: Build DEBUG with JS Bundle packaged
+      - name: MANUAL BUNDLE - para hindi na Unable to load script
+        run: |
+          mkdir -p android/app/src/main/assets
+          npx react-native bundle --platform android --dev false --entry-file node_modules/expo/AppEntry.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res/
+
+      - name: Build Debug APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew clean
-          ./gradlew :app:bundleDebugJsAndAssets
           ./gradlew assembleDebug --stacktrace
 
       - uses: actions/upload-artifact@v4
