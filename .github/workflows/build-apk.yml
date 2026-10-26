@@ -22,10 +22,7 @@ jobs:
       - name: Install deps
         run: npm install --legacy-peer-deps
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Prebuild Android folder locally
+      - name: Prebuild Android locally
         run: npx expo prebuild --platform android --clean --non-interactive
 
       - name: Build APK locally
