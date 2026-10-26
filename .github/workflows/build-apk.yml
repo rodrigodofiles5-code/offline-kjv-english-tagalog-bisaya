@@ -16,7 +16,7 @@ jobs:
       - name: Deep Clean
         run: rm -rf android node_modules package-lock.json ~/.gradle
 
-      - name: Install - Auto Fix SDK 53 versions
+      - name: Install - Auto Fix SDK 53
         run: |
           npm i --legacy-peer-deps
           npx expo install expo@~53.0.20 --fix -- --legacy-peer-deps
@@ -25,12 +25,13 @@ jobs:
       - name: Prebuild
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: FIX - Expo 53 official versions
+      - name: FIX - Gradle 8.10.2 + File.plus fix
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.10.2-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
           python3 << 'PY'
           import pathlib, re
+          # 1. Kotlin + AGP
           b = pathlib.Path('android/build.gradle').read_text()
           b = re.sub(r"kotlinVersion.*", "kotlinVersion = '2.0.21'", b)
           b = re.sub(r"kspVersion.*", "kspVersion = '2.0.21-1.0.28'", b)
@@ -38,9 +39,19 @@ jobs:
           if "2.0.21" not in b:
               b = b.replace('buildscript {', "buildscript {\n    ext { kotlinVersion = '2.0.21'; kspVersion = '2.0.21-1.0.28' }")
           pathlib.Path('android/build.gradle').write_text(b)
-          app = pathlib.Path('android/app/build.gradle').read_text().replace('.getAbsolutePath()','')
-          pathlib.Path('android/app/build.gradle').write_text(app)
-          print("FIXED 8.10.2 + Kotlin 2.0.21")
+
+          # 2. FIX File.plus() error sa app/build.gradle
+          app_path = pathlib.Path('android/app/build.gradle')
+          txt = app_path.read_text()
+          # Ito yung sumisira: File + String
+          txt = txt.replace('+ "/sdks/hermesc/%OS-BIN%/hermesc"', '.absolutePath + "/sdks/hermesc/%OS-BIN%/hermesc"')
+          txt = txt.replace('+ "/sdks/hermesc/%OS-BIN%/hermesc"', '.absolutePath + "/sdks/hermesc/%OS-BIN%/hermesc"')
+          # generic fix: any File variable + "/sdks"
+          txt = re.sub(r'(\w+)\s*\+\s*"/sdks/hermesc', r'\1.absolutePath + "/sdks/hermesc', txt)
+          txt = re.sub(r'(\w+)\s*\+\s*"/sdks', r'\1.absolutePath + "/sdks', txt)
+          # alternative: kung may natirang .getAbsolutePath() na tinanggal dati, ibalik sa absolutePath form
+          pathlib.Path('android/app/build.gradle').write_text(txt)
+          print("FIXED File.plus")
           PY
 
       - name: Build APK
