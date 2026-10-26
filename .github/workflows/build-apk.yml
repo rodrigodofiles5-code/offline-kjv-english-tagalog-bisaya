@@ -22,12 +22,13 @@ jobs:
       - name: Remove old android folder
         run: rm -rf android
 
-      - name: Install deps + FIX worklets version
+      - name: Install deps + FIX worklets 0.8.0
         run: |
-          npm install --legacy-peer-deps
-          # ITO YUNG FIX SA ERROR MO - 0.10.1 is too new, need 0.5.x
-          npm install react-native-worklets@0.5.1 --save --legacy-peer-deps
-          npm list react-native-worklets
+          rm -rf node_modules package-lock.json
+          npm install --legacy-peer-deps --force
+          # Ito yung gitna - 0.8.0 pasok sa expo at sa reanimated
+          npm install react-native-worklets@0.8.0 --save --legacy-peer-deps --force
+          echo "Worklets fixed to 0.8.0"
 
       - name: Prebuild fresh android
         run: npx expo prebuild --platform android --clean --non-interactive
