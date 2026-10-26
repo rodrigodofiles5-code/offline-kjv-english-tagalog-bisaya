@@ -13,17 +13,17 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Install dependencies
+      - name: Install
         run: npm install --legacy-peer-deps
-      - name: Prebuild Android
-        run: npx expo prebuild --platform android --non-interactive --no-install
-      - name: Build APK
+      - name: Prebuild fresh
+        run: npx expo prebuild --platform android --clean
+      - name: Build APK Debug
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease
+          ./gradlew assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Bible-APK
-          path: android/app/build/outputs/apk/release/*.apk
+          path: android/app/build/outputs/apk/debug/*.apk
