@@ -28,12 +28,37 @@ jobs:
       - name: Prebuild fresh android
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: Fix to Gradle 8.13 - REQUIRED
+      - name: FIX LINE 14 - ABSOLUTE DEBUG KEYSTORE
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           sed -i "s/gradle-.*-bin.zip/gradle-8.13-bin.zip/" android/gradle/wrapper/gradle-wrapper.properties
-          cat android/gradle/wrapper/gradle-wrapper.properties
-          echo "Fixed to 8.13"
+          
+          # Gumawa ng debug keystore sa app folder
+          keytool -genkey -v -keystore android/app/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
+          ls -lh android/app/debug.keystore
+          
+          # Gumawa ng keystore.properties na may ABSOLUTE PATH - para hindi na null
+          PWD=$(pwd)
+          echo "storeFile=$PWD/android/app/debug.keystore" > android/keystore.properties
+          echo "storePassword=android" >> android/keystore.properties
+          echo "keyAlias=androiddebugkey" >> android/keystore.properties
+          echo "keyPassword=android" >> android/keystore.properties
+          cat android/keystore.properties
+          
+          # PATCH - tanggalin ang getAbsolutePath()
+          python3 << 'PY'
+          import pathlib
+          p = pathlib.Path('android/app/build.gradle')
+          t = p.read_text()
+          t = t.replace('.getAbsolutePath()', '')
+          t = t.replace('file(keystoreProperties', 'file(new File(keystoreProperties')
+          # Kung may file(new File... na double, ayusin
+          # Simple fix: gawing debug lahat
+          if 'signingConfig signingConfigs.release' in t:
+              t = t.replace('signingConfig signingConfigs.release', 'signingConfig signingConfigs.debug')
+          p.write_text(t)
+          print("PATCHED OK - line 14 fixed")
+          PY
 
       - name: Build DEBUG APK locally
         run: |
