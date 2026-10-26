@@ -19,12 +19,12 @@ jobs:
       - name: Create eas.json if missing
         run: |
           if [ ! -f eas.json ]; then
-            echo '{"cli":{"version":">= 5.9.0"},"build":{"preview":{"distribution":"internal","android":{"buildType":"apk"}}},"submit":{"production":{}}}' > eas.json
+            echo '{"cli":{"version":">= 5.9.0"},"build":{"preview":{"distribution":"internal","android":{"buildType":"apk"}}}}' > eas.json
           fi
 
-      - uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm install -g eas-cli
 
-      - run: eas build --platform android --profile preview --non-interactive --no-wait
+      - name: Build APK
+        run: eas build --platform android --profile preview --non-interactive --no-wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
